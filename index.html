@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nawigacja</title>
+
+<style>
+body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: white;
+    overflow: hidden;
+}
+
+#arrow {
+    font-size: 150px;
+    transition: transform 0.2s linear;
+}
+</style>
+</head>
+<body>
+
+<div id="arrow">⬆️</div>
+
+<script>
+const targetLat = 51.085631214215425; // TU wpisz szerokość celu
+const targetLon = 17.051708190989366; // TU wpisz długość celu
+
+let heading = 0;
+
+function toRad(deg) {
+    return deg * Math.PI / 180;
+}
+
+function toDeg(rad) {
+    return rad * 180 / Math.PI;
+}
+
+function getBearing(lat1, lon1, lat2, lon2) {
+    const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+
+    const x =
+        Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+        Math.sin(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.cos(toRad(lon2 - lon1));
+
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+navigator.geolocation.watchPosition(
+    position => {
+
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        const bearing = getBearing(
+            lat,
+            lon,
+            targetLat,
+            targetLon
+        );
+
+        const rotation = bearing - heading;
+
+        document.getElementById("arrow").style.transform =
+            `rotate(${rotation}deg)`;
+    },
+    err => {
+        alert("Włącz lokalizację GPS");
+    },
+    {
+        enableHighAccuracy: true
+    }
+);
+
+function updateCompass(event) {
+    if (event.webkitCompassHeading) {
+        heading = event.webkitCompassHeading;
+    } else {
+        heading = 360 - event.alpha;
+    }
+}
+
+window.addEventListener(
+    "deviceorientationabsolute",
+    updateCompass,
+    true
+);
+
+window.addEventListener(
+    "deviceorientation",
+    updateCompass,
+    true
+);
+</script>
+
+</body>
+</html>
