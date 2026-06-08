@@ -111,15 +111,7 @@ function updateArrow(){
     document.getElementById("arrow").style.transform =
         `rotate(${rotation}deg)`;
 
-    const distance = calculateDistance(
-        lat,
-        lon,
-        TARGET_LAT,
-        TARGET_LON
-    );
-
-    document.getElementById("distance").innerText =
-        distance + " m";
+   
 }
 
 function startGPS(){
