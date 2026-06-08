@@ -1,102 +1,213 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nawigacja</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nawigator</title>
 
 <style>
-body {
-    margin: 0;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: white;
-    overflow: hidden;
+body{
+    margin:0;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    font-family:Arial,sans-serif;
 }
 
-#arrow {
-    font-size: 150px;
-    transition: transform 0.2s linear;
+#arrow{
+    font-size:140px;
+    transition:transform 0.1s linear;
+}
+
+#distance{
+    font-size:24px;
+    margin-top:20px;
+}
+
+button{
+    padding:12px 20px;
+    margin-bottom:20px;
 }
 </style>
 </head>
 <body>
 
+<button id="startBtn">Uruchom kompas</button>
+
 <div id="arrow">⬆️</div>
 
+<div id="distance">-- m</div>
+
 <script>
-const targetLat = 51.085631214215425; // TU wpisz szerokość celu
-const targetLon = 17.051708190989366; // TU wpisz długość celu
 
-let heading = 0;
+const TARGET_LAT = 51.08561691777356; // wpisz swoje
+const TARGET_LON = 17.05173095028728; // wpisz swoje
 
-function toRad(deg) {
+let currentHeading = 0;
+let currentPosition = null;
+
+function toRad(deg){
     return deg * Math.PI / 180;
 }
 
-function toDeg(rad) {
+function toDeg(rad){
     return rad * 180 / Math.PI;
 }
 
-function getBearing(lat1, lon1, lat2, lon2) {
-    const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+function calculateBearing(lat1, lon1, lat2, lon2){
+
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const λ1 = toRad(lon1);
+    const λ2 = toRad(lon2);
+
+    const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
 
     const x =
-        Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-        Math.sin(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.cos(toRad(lon2 - lon1));
+        Math.cos(φ1) * Math.sin(φ2) -
+        Math.sin(φ1) * Math.cos(φ2) *
+        Math.cos(λ2 - λ1);
 
-    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    return (toDeg(Math.atan2(y,x)) + 360) % 360;
 }
 
-navigator.geolocation.watchPosition(
-    position => {
+function calculateDistance(lat1, lon1, lat2, lon2){
 
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
+    const R = 6371000;
 
-        const bearing = getBearing(
-            lat,
-            lon,
-            targetLat,
-            targetLon
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+
+    const a =
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon/2) *
+        Math.sin(dLon/2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+    return Math.round(R*c);
+}
+
+function updateArrow(){
+
+    if(!currentPosition) return;
+
+    const lat = currentPosition.coords.latitude;
+    const lon = currentPosition.coords.longitude;
+
+    const bearing = calculateBearing(
+        lat,
+        lon,
+        TARGET_LAT,
+        TARGET_LON
+    );
+
+    let rotation = bearing - currentHeading;
+
+    document.getElementById("arrow").style.transform =
+        `rotate(${rotation}deg)`;
+
+    const distance = calculateDistance(
+        lat,
+        lon,
+        TARGET_LAT,
+        TARGET_LON
+    );
+
+    document.getElementById("distance").innerText =
+        distance + " m";
+}
+
+function startGPS(){
+
+    navigator.geolocation.watchPosition(
+        pos=>{
+            currentPosition = pos;
+            updateArrow();
+        },
+        err=>{
+            alert("Brak dostępu do GPS");
+        },
+        {
+            enableHighAccuracy:true,
+            maximumAge:0
+        }
+    );
+}
+
+function startCompass(){
+
+    if (
+        typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function"
+    ){
+
+        DeviceOrientationEvent
+        .requestPermission()
+        .then(response=>{
+
+            if(response==="granted"){
+
+                window.addEventListener(
+                    "deviceorientation",
+                    e=>{
+                        currentHeading =
+                            e.webkitCompassHeading ||
+                            (360 - e.alpha);
+
+                        updateArrow();
+                    },
+                    true
+                );
+
+                startGPS();
+            }
+        });
+
+    }else{
+
+        window.addEventListener(
+            "deviceorientationabsolute",
+            e=>{
+
+                if(e.alpha != null){
+
+                    currentHeading =
+                        360 - e.alpha;
+
+                    updateArrow();
+                }
+            },
+            true
         );
 
-        const rotation = bearing - heading;
+        window.addEventListener(
+            "deviceorientation",
+            e=>{
 
-        document.getElementById("arrow").style.transform =
-            `rotate(${rotation}deg)`;
-    },
-    err => {
-        alert("Włącz lokalizację GPS");
-    },
-    {
-        enableHighAccuracy: true
-    }
-);
+                if(e.alpha != null){
 
-function updateCompass(event) {
-    if (event.webkitCompassHeading) {
-        heading = event.webkitCompassHeading;
-    } else {
-        heading = 360 - event.alpha;
+                    currentHeading =
+                        360 - e.alpha;
+
+                    updateArrow();
+                }
+            },
+            true
+        );
+
+        startGPS();
     }
 }
 
-window.addEventListener(
-    "deviceorientationabsolute",
-    updateCompass,
-    true
-);
+document
+.getElementById("startBtn")
+.addEventListener("click", startCompass);
 
-window.addEventListener(
-    "deviceorientation",
-    updateCompass,
-    true
-);
 </script>
 
 </body>
